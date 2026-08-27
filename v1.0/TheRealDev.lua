@@ -1,792 +1,565 @@
--- ============================================================
 -- TheRealDev.lua
 -- GodMode9 Lua 5.4
+-- Safe multi-tool menu
 --
--- Large utility menu
--- 10-button security locks for sensitive operations
--- ============================================================
+-- Put this file in:
+-- 0:/gm9/luascripts/TheRealDev.lua
 
 local APP_NAME = "TheRealDev"
 local VERSION = "1.0"
 
--- ============================================================
--- CONFIGURATION
--- ============================================================
+------------------------------------------------------------
+-- Helpers
+------------------------------------------------------------
 
-local NORMAL_LOCK = {
-    "A",
-    "LEFT",
-    "B",
-    "RIGHT",
-    "UP",
-    "DOWN",
-    "L",
-    "R",
-    "X",
-    "Y"
-}
+local function wait_a()
+    ui.echo("Press A to continue.")
+end
 
-local DANGER_LOCK = {
-    "LEFT",
-    "A",
-    "DOWN",
-    "B",
-    "RIGHT",
-    "L",
-    "UP",
-    "R",
-    "X",
-    "Y"
-}
+local function confirm(text)
+    return ui.ask(text)
+end
 
-local EXTREME_LOCK = {
-    "R",
-    "UP",
-    "A",
-    "LEFT",
-    "Y",
-    "DOWN",
-    "B",
-    "RIGHT",
-    "L",
-    "X"
-}
+local function show_error(message)
+    ui.echo("ERROR\n\n" .. tostring(message))
+end
 
--- ============================================================
--- HELPERS
--- ============================================================
+local function safe_call(fn)
+    local ok, err = pcall(fn)
 
-local ALL_KEYS = {
-    "A", "B",
-    "X", "Y",
-    "L", "R",
-    "START", "SELECT",
-    "UP", "DOWN", "LEFT", "RIGHT"
-}
-
-local function wait_release()
-    while true do
-        local held = false
-
-        for _, key in ipairs(ALL_KEYS) do
-            if ui.check_key(key) then
-                held = true
-                break
-            end
-        end
-
-        if not held then
-            return
-        end
+    if not ok then
+        show_error(err)
+        return false
     end
-end
-
-local function wait_key()
-    while true do
-        for _, key in ipairs(ALL_KEYS) do
-            if ui.check_key(key) then
-                wait_release()
-                return key
-            end
-        end
-    end
-end
-
-local function message(text)
-    ui.echo(
-        APP_NAME .. "\n\n" ..
-        text
-    )
-end
-
-local function separator()
-    return "\n\n------------------------------\n\n"
-end
-
--- ============================================================
--- SECURITY LOCK
--- ============================================================
-
-local function security_lock(title, sequence)
-
-    message(
-        "SECURITY LOCK\n\n" ..
-        title .. "\n\n" ..
-        "10-button verification required.\n\n" ..
-        "Press A to begin."
-    )
-
-    for i = 1, #sequence do
-
-        local expected = sequence[i]
-
-        -- ui.echo is the supported GM9 prompt mechanism.
-        -- ui.check_key performs the actual key detection.
-        message(
-            "SECURITY LOCK\n\n" ..
-            title .. "\n\n" ..
-            "STEP " .. i .. " / " .. #sequence ..
-            "\n\n" ..
-            "NEXT BUTTON:\n\n" ..
-            expected .. "\n\n" ..
-            "Wrong input = MAIN MENU"
-        )
-
-        local key = wait_key()
-
-        if key ~= expected then
-
-            message(
-                "ACCESS DENIED\n\n" ..
-                "Incorrect button.\n\n" ..
-                "Returning to main menu."
-            )
-
-            return false
-        end
-    end
-
-    message(
-        "ACCESS GRANTED\n\n" ..
-        "Security sequence accepted."
-    )
 
     return true
 end
 
-local function danger_lock(title)
-    return security_lock(title, DANGER_LOCK)
+local function select_file(prompt, pattern)
+    local path = fs.ask_select_file(prompt, pattern, {
+        include_dirs = false,
+        explorer = true
+    })
+
+    return path
 end
 
-local function extreme_lock(title)
-    return security_lock(title, EXTREME_LOCK)
+local function select_dir(prompt, path)
+    return fs.ask_select_dir(prompt, path, {
+        explorer = true
+    })
 end
 
--- ============================================================
--- SYSTEM INFORMATION
--- ============================================================
+------------------------------------------------------------
+-- Main menu
+------------------------------------------------------------
+
+local function main_menu()
+    return ui.ask_selection(
+        APP_NAME .. " v" .. VERSION,
+        {
+            "System Information",
+            "SD Card Information",
+            "File Tools",
+            "Hash & Verify",
+            "Title / CIA Tools",
+            "Patch Tools",
+            "Code Tools",
+            "Key Tools",
+            "Database Tools",
+            "Cartridge Tools",
+            "LED Tools",
+            "Utilities",
+            "10-Step Lock Test",
+            "About TheRealDev",
+            "Exit"
+        }
+    )
+end
+
+------------------------------------------------------------
+-- System information
+------------------------------------------------------------
 
 local function system_information()
+    local text = "SYSTEM INFORMATION\n\n"
 
-    local region = sys.region or "Unknown"
-    local serial = sys.serial or "Unknown"
-    local id0 = sys.sys_id0 or "Unknown"
+    text = text .. "GodMode9: " .. tostring(GM9VER) .. "\n"
+    text = text .. "Console: " .. tostring(CONSOLE_TYPE) .. "\n"
+    text = text .. "Devkit: " .. tostring(IS_DEVKIT) .. "\n"
+    text = text .. "Region: " .. tostring(sys.region) .. "\n"
+    text = text .. "Serial: " .. tostring(sys.serial) .. "\n"
+    text = text .. "SecureInfo: " .. tostring(sys.secureinfo_letter) .. "\n"
+    text = text .. "SysNAND ID0: " .. tostring(sys.sys_id0) .. "\n"
+    text = text .. "EmuNAND ID0: " .. tostring(sys.emu_id0) .. "\n"
+    text = text .. "EmuNAND base: " .. tostring(sys.emu_base) .. "\n"
+    text = text .. "Gyro model: " .. tostring(GYROMODEL) .. "\n"
+    text = text .. "HAX: " .. tostring(HAX) .. "\n"
+    text = text .. "Script: " .. tostring(SCRIPT)
 
-    message(
-        "SYSTEM INFORMATION\n\n" ..
-        "GodMode9: " .. tostring(GM9VER) .. "\n" ..
-        "Console: " .. tostring(CONSOLE_TYPE) .. "\n" ..
-        "Region: " .. region .. "\n" ..
-        "Serial: " .. serial .. "\n\n" ..
-        "SysNAND ID0:\n" ..
-        id0
-    )
+    ui.show_text(text)
+    wait_a()
 end
 
-local function emunand_information()
-
-    local id0 = sys.emu_id0 or "None"
-    local base = sys.emu_base or 0
-
-    message(
-        "EMUNAND INFORMATION\n\n" ..
-        "EmuNAND ID0:\n" ..
-        id0 .. "\n\n" ..
-        "Base: " .. tostring(base)
-    )
-end
-
-local function console_information()
-
-    message(
-        "CONSOLE INFORMATION\n\n" ..
-        "Type: " .. tostring(CONSOLE_TYPE) .. "\n" ..
-        "Devkit: " .. tostring(IS_DEVKIT) .. "\n" ..
-        "Gyro model: " .. tostring(GYROMODEL) .. "\n" ..
-        "HAX: " .. tostring(HAX)
-    )
-end
-
-local function date_time()
-
-    message(
-        "DATE / TIME\n\n" ..
-        "Date: " .. util.get_datestamp() .. "\n" ..
-        "Time: " .. util.get_timestamp()
-    )
-end
-
--- ============================================================
--- STORAGE INFORMATION
--- ============================================================
+------------------------------------------------------------
+-- SD information
+------------------------------------------------------------
 
 local function sd_information()
+    safe_call(function()
+        local s = fs.stat_fs("0:/")
 
-    local stat = fs.stat_fs("0:/")
+        local text = "SD CARD INFORMATION\n\n"
+        text = text .. "Total: " .. ui.format_bytes(s.total) .. "\n"
+        text = text .. "Used:  " .. ui.format_bytes(s.used) .. "\n"
+        text = text .. "Free:  " .. ui.format_bytes(s.free)
 
-    message(
-        "SD CARD INFORMATION\n\n" ..
-        "Total:\n" ..
-        ui.format_bytes(stat.total) .. "\n\n" ..
-        "Used:\n" ..
-        ui.format_bytes(stat.used) .. "\n\n" ..
-        "Free:\n" ..
-        ui.format_bytes(stat.free)
-    )
+        ui.show_text(text)
+        wait_a()
+    end)
 end
 
-local function directory_information()
+------------------------------------------------------------
+-- File tools
+------------------------------------------------------------
 
-    local path = fs.ask_select_dir(
-        "Select directory",
+local function copy_file()
+    local src = select_file(
+        "Select file to COPY",
+        "0:/*"
+    )
+
+    if not src then
+        return
+    end
+
+    local dst = ui.ask_text(
+        "Destination path:",
         "0:/",
-        { explorer = true }
+        200
+    )
+
+    if not dst then
+        return
+    end
+
+    if not confirm(
+        "COPY FILE?\n\n" ..
+        src .. "\n\nTO\n\n" ..
+        dst
+    ) then
+        return
+    end
+
+    safe_call(function()
+        fs.copy(src, dst, {
+            overwrite = false
+        })
+
+        ui.echo("Copy completed.")
+    end)
+end
+
+local function move_file()
+    local src = select_file(
+        "Select file to MOVE",
+        "0:/*"
+    )
+
+    if not src then
+        return
+    end
+
+    local dst = ui.ask_text(
+        "Destination path:",
+        "0:/",
+        200
+    )
+
+    if not dst then
+        return
+    end
+
+    if not confirm(
+        "MOVE FILE?\n\n" ..
+        src .. "\n\nTO\n\n" ..
+        dst
+    ) then
+        return
+    end
+
+    safe_call(function()
+        fs.move(src, dst)
+        ui.echo("Move completed.")
+    end)
+end
+
+local function delete_file()
+    local path = select_file(
+        "Select file to DELETE",
+        "0:/*"
     )
 
     if not path then
         return
     end
 
-    local info = fs.dir_info(path)
+    if not confirm(
+        "WARNING!\n\nDELETE THIS FILE?\n\n" ..
+        path
+    ) then
+        return
+    end
 
-    message(
-        "DIRECTORY INFORMATION\n\n" ..
-        "Path:\n" .. path .. "\n\n" ..
-        "Files: " .. tostring(info.files) .. "\n" ..
-        "Directories: " .. tostring(info.dirs) .. "\n" ..
-        "Size: " .. ui.format_bytes(info.size)
+    safe_call(function()
+        fs.remove(path)
+        ui.echo("File deleted.")
+    end)
+end
+
+local function create_directory()
+    local path = ui.ask_text(
+        "New directory path:",
+        "0:/",
+        200
     )
+
+    if not path then
+        return
+    end
+
+    safe_call(function()
+        fs.mkdir(path)
+        ui.echo("Directory created.")
+    end)
 end
 
 local function file_information()
-
-    local path = fs.ask_select_file(
-        "Select file",
-        "0:/*",
-        { include_dirs = false, explorer = true }
+    local path = select_file(
+        "Select a file",
+        "0:/*"
     )
 
     if not path then
         return
     end
 
-    local stat = fs.stat(path)
+    safe_call(function()
+        local s = fs.stat(path)
 
-    message(
-        "FILE INFORMATION\n\n" ..
-        "Name:\n" .. stat.name .. "\n\n" ..
-        "Type: " .. stat.type .. "\n" ..
-        "Size: " .. ui.format_bytes(stat.size) .. "\n" ..
-        "Read only: " .. tostring(stat.read_only) .. "\n\n" ..
-        "Path:\n" .. path
-    )
+        ui.show_text(
+            "FILE INFORMATION\n\n" ..
+            "Name: " .. tostring(s.name) .. "\n" ..
+            "Type: " .. tostring(s.type) .. "\n" ..
+            "Size: " .. ui.format_bytes(s.size) .. "\n" ..
+            "Read-only: " .. tostring(s.read_only)
+        )
+
+        wait_a()
+    end)
 end
 
--- ============================================================
--- FILE TOOLS
--- ============================================================
-
-local function browse_files()
-
-    local path = fs.ask_select_file(
-        "FILE BROWSER",
-        "0:/*",
-        { include_dirs = true, explorer = true }
-    )
-
-    if not path then
-        return
-    end
-
-    message(
-        "SELECTED ITEM\n\n" ..
-        path
-    )
-end
-
-local function find_files()
-
+local function find_file()
     local pattern = ui.ask_text(
-        "Search pattern",
-        "*",
-        100
+        "Search pattern:",
+        "0:/",
+        200
     )
 
     if not pattern then
         return
     end
 
-    local results = fs.find_all(
-        "0:/",
-        pattern,
-        { recursive = true }
-    )
+    safe_call(function()
+        local result = fs.find(pattern, {
+            first = true
+        })
 
-    local text = "SEARCH RESULTS\n\n"
-
-    if #results == 0 then
-        text = text .. "No files found."
-    else
-        for i, path in ipairs(results) do
-            text = text ..
-                tostring(i) .. ". " ..
-                tostring(path) .. "\n"
+        if result then
+            ui.show_text(
+                "SEARCH RESULT\n\n" ..
+                result
+            )
+        else
+            ui.show_text(
+                "SEARCH RESULT\n\n" ..
+                "Nothing found."
+            )
         end
-    end
 
-    ui.show_text_viewer(text)
+        wait_a()
+    end)
 end
 
-local function hash_file()
+local function file_tools()
+    while true do
+        local choice = ui.ask_selection(
+            "FILE TOOLS",
+            {
+                "Copy",
+                "Move",
+                "Delete",
+                "Create Directory",
+                "File Information",
+                "Find File",
+                "Back"
+            }
+        )
 
-    local path = fs.ask_select_file(
-        "Select file to hash",
-        "0:/*",
-        { include_dirs = false, explorer = true }
+        if not choice or choice == 7 then
+            return
+        elseif choice == 1 then
+            copy_file()
+        elseif choice == 2 then
+            move_file()
+        elseif choice == 3 then
+            delete_file()
+        elseif choice == 4 then
+            create_directory()
+        elseif choice == 5 then
+            file_information()
+        elseif choice == 6 then
+            find_file()
+        end
+    end
+end
+
+------------------------------------------------------------
+-- Hash & Verify
+------------------------------------------------------------
+
+local function hash_file()
+    local path = select_file(
+        "Select file to HASH",
+        "0:/*"
     )
 
     if not path then
         return
     end
 
-    local hash = fs.hash_file(path, 0, 0)
-    local hex = util.bytes_to_hex(hash)
+    safe_call(function()
+        local hash = fs.hash_file(path, 0, 0)
+        local hex = util.bytes_to_hex(hash)
 
-    ui.show_text_viewer(
-        "SHA-256\n\n" ..
-        path .. "\n\n" ..
-        hex
-    )
+        ui.show_text(
+            "SHA-256\n\n" ..
+            path .. "\n\n" ..
+            hex
+        )
+
+        wait_a()
+    end)
 end
 
 local function verify_file()
-
-    local path = fs.ask_select_file(
-        "Select file to verify",
-        "0:/*",
-        { include_dirs = false, explorer = true }
+    local path = select_file(
+        "Select file to VERIFY",
+        "0:/*"
     )
 
     if not path then
         return
     end
 
-    local result = fs.verify(path)
+    safe_call(function()
+        local result = fs.verify(path)
 
-    if result then
-        message(
-            "VERIFY RESULT\n\n" ..
-            "SUCCESS\n\n" ..
-            path
-        )
-    else
-        message(
-            "VERIFY RESULT\n\n" ..
-            "FAILED / NOT VERIFIABLE\n\n" ..
-            path
-        )
-    end
+        if result then
+            ui.echo("Verification successful.")
+        else
+            ui.echo("Verification failed or file is not verifiable.")
+        end
+    end)
 end
 
 local function verify_sha()
-
-    local path = fs.ask_select_file(
-        "Select file",
-        "0:/*",
-        { include_dirs = false, explorer = true }
+    local path = select_file(
+        "Select file with .sha",
+        "0:/*"
     )
 
     if not path then
         return
     end
 
-    local result = fs.verify_with_sha_file(path)
+    safe_call(function()
+        local result = fs.verify_with_sha_file(path)
 
-    if result == true then
-        message("SHA-256 CHECK\n\nMATCH")
-    elseif result == false then
-        message("SHA-256 CHECK\n\nMISMATCH")
-    else
-        message("SHA-256 CHECK\n\nSHA FILE NOT FOUND")
+        if result == true then
+            ui.echo("SHA-256 verification successful.")
+        elseif result == false then
+            ui.echo("SHA-256 verification failed.")
+        else
+            ui.echo("Could not read the .sha file.")
+        end
+    end)
+end
+
+local function hash_verify()
+    while true do
+        local choice = ui.ask_selection(
+            "HASH & VERIFY",
+            {
+                "SHA-256 File Hash",
+                "Verify File",
+                "Verify .sha File",
+                "Back"
+            }
+        )
+
+        if not choice or choice == 4 then
+            return
+        elseif choice == 1 then
+            hash_file()
+        elseif choice == 2 then
+            verify_file()
+        elseif choice == 3 then
+            verify_sha()
+        end
     end
 end
 
--- ============================================================
--- QR / TEXT
--- ============================================================
-
-local function qr_tool()
-
-    local text = ui.ask_text(
-        "QR title",
-        "TheRealDev",
-        100
-    )
-
-    if not text then
-        return
-    end
-
-    local data = ui.ask_text(
-        "QR data",
-        "",
-        500
-    )
-
-    if not data then
-        return
-    end
-
-    ui.show_qr(text, data)
-end
-
-local function text_viewer()
-
-    local path = fs.ask_select_file(
-        "Select text file",
-        "0:/*",
-        { include_dirs = false, explorer = true }
-    )
-
-    if not path then
-        return
-    end
-
-    ui.show_file_text_viewer(path)
-end
-
--- ============================================================
--- GAME / TITLE TOOLS
--- ============================================================
+------------------------------------------------------------
+-- Title / CIA
+------------------------------------------------------------
 
 local function build_cia()
-
-    if not danger_lock("BUILD CIA") then
-        return
-    end
-
-    local path = fs.ask_select_file(
-        "Select title",
-        "0:/*",
-        { include_dirs = false, explorer = true }
+    local path = select_file(
+        "Select title to build as CIA",
+        "0:/*"
     )
 
     if not path then
         return
     end
 
-    title.build_cia(path)
+    if not confirm(
+        "Build CIA from:\n\n" ..
+        path .. "?"
+    ) then
+        return
+    end
 
-    message(
-        "CIA BUILD\n\n" ..
-        "Finished.\n\n" ..
-        "Output:\n0:/gm9/out"
-    )
+    safe_call(function()
+        title.build_cia(path)
+        ui.echo("CIA build completed.\n\nCheck:\n0:/gm9/out")
+    end)
 end
 
-local function extract_code()
+local function install_title()
+    local path = select_file(
+        "Select title to install",
+        "0:/*"
+    )
 
-    if not danger_lock("EXTRACT CODE") then
+    if not path then
         return
     end
 
-    local src = fs.ask_select_file(
-        "Select title",
-        "0:/*",
-        { include_dirs = false, explorer = true }
-    )
-
-    if not src then
+    if not confirm(
+        "INSTALL THIS TITLE?\n\n" ..
+        path
+    ) then
         return
     end
 
-    local dst = ui.ask_text(
-        "Destination",
-        "0:/gm9/out/extracted.code",
-        200
-    )
-
-    if not dst then
-        return
-    end
-
-    title.extract_code(src, dst)
-
-    message(
-        "CODE EXTRACTION\n\n" ..
-        "Completed.\n\n" ..
-        dst
-    )
+    safe_call(function()
+        title.install(path)
+        ui.echo("Installation completed.")
+    end)
 end
 
-local function compress_code()
+local function decrypt_title()
+    local path = select_file(
+        "Select title/database to decrypt",
+        "0:/*"
+    )
 
-    if not danger_lock("COMPRESS CODE") then
+    if not path then
         return
     end
 
-    local src = fs.ask_select_file(
-        "Select .code",
-        "0:/*",
-        { include_dirs = false, explorer = true }
-    )
-
-    if not src then
+    if not confirm(
+        "DECRYPT IN PLACE?\n\n" ..
+        path
+    ) then
         return
     end
 
-    local dst = ui.ask_text(
-        "Destination",
-        "0:/gm9/out/compressed.code",
-        200
-    )
-
-    if not dst then
-        return
-    end
-
-    title.compress_code(src, dst)
-
-    message(
-        "CODE COMPRESSION\n\n" ..
-        "Completed."
-    )
+    safe_call(function()
+        title.decrypt(path)
+        ui.echo("Decryption completed.")
+    end)
 end
 
--- ============================================================
--- PATCHING
--- ============================================================
-
-local function patch_menu()
-
-    local choice = ui.ask_selection(
-        "PATCH TYPE",
-        {
-            "IPS",
-            "BPS",
-            "BPM",
-            "Cancel"
-        }
+local function encrypt_title()
+    local path = select_file(
+        "Select title/database to encrypt",
+        "0:/*"
     )
 
-    if not choice or choice == 4 then
+    if not path then
         return
     end
 
-    if not danger_lock("PATCH OPERATION") then
+    if not confirm(
+        "ENCRYPT IN PLACE?\n\n" ..
+        path
+    ) then
         return
     end
 
-    local patch = fs.ask_select_file(
-        "Select patch",
-        "0:/*",
-        { include_dirs = false, explorer = true }
+    safe_call(function()
+        title.encrypt(path)
+        ui.echo("Encryption completed.")
+    end)
+end
+
+local function title_tools()
+    while true do
+        local choice = ui.ask_selection(
+            "TITLE / CIA TOOLS",
+            {
+                "Build CIA",
+                "Install Title",
+                "Decrypt",
+                "Encrypt",
+                "Back"
+            }
+        )
+
+        if not choice or choice == 5 then
+            return
+        elseif choice == 1 then
+            build_cia()
+        elseif choice == 2 then
+            install_title()
+        elseif choice == 3 then
+            decrypt_title()
+        elseif choice == 4 then
+            encrypt_title()
+        end
+    end
+end
+
+------------------------------------------------------------
+-- Patch tools
+------------------------------------------------------------
+
+local function apply_patch(kind)
+    local patch = select_file(
+        "Select " .. kind .. " patch",
+        "0:/*." .. string.lower(kind)
     )
 
     if not patch then
         return
     end
 
-    local src = fs.ask_select_file(
-        "Select source",
-        "0:/*",
-        { include_dirs = false, explorer = true }
-    )
-
-    if not src then
-        return
-    end
-
-    local target = ui.ask_text(
-        "Output path",
-        "0:/gm9/out/patched.bin",
-        200
-    )
-
-    if not target then
-        return
-    end
-
-    if choice == 1 then
-        title.apply_ips(patch, src, target)
-    elseif choice == 2 then
-        title.apply_bps(patch, src, target)
-    elseif choice == 3 then
-        title.apply_bpm(patch, src, target)
-    end
-
-    message(
-        "PATCH COMPLETE\n\n" ..
-        target
-    )
-end
-
--- ============================================================
--- KEY DUMP
--- ============================================================
-
-local function key_dump()
-
-    if not danger_lock("KEY DUMP") then
-        return
-    end
-
-    local choice = ui.ask_selection(
-        "KEY DUMP",
-        {
-            "seeddb.bin",
-            "encTitleKeys.bin",
-            "decTitleKeys.bin",
-            "Cancel"
-        }
-    )
-
-    if not choice or choice == 4 then
-        return
-    end
-
-    local files = {
-        "seeddb.bin",
-        "encTitleKeys.bin",
-        "decTitleKeys.bin"
-    }
-
-    fs.key_dump(files[choice])
-
-    message(
-        "KEY DUMP COMPLETE\n\n" ..
-        "Output:\n0:/gm9/out/" ..
-        files[choice]
-    )
-end
-
--- ============================================================
--- MOUNTED IMAGE
--- ============================================================
-
-local function mounted_image()
-
-    local path = fs.get_img_mount()
-
-    if path then
-        message(
-            "MOUNTED IMAGE\n\n" ..
-            path
-        )
-    else
-        message(
-            "MOUNTED IMAGE\n\n" ..
-            "No image is mounted."
-        )
-    end
-end
-
-local function mount_image()
-
-    local path = fs.ask_select_file(
-        "Select image",
-        "0:/*",
-        { include_dirs = false, explorer = true }
-    )
-
-    if not path then
-        return
-    end
-
-    fs.img_mount(path)
-
-    message(
-        "IMAGE MOUNTED\n\n" ..
-        path
-    )
-end
-
-local function unmount_image()
-
-    fs.img_umount()
-
-    message(
-        "IMAGE\n\n" ..
-        "Unmounted."
-    )
-end
-
--- ============================================================
--- GAME CARD
--- ============================================================
-
-local function cart_dump()
-
-    if not extreme_lock("GAME CARD DUMP") then
-        return
-    end
-
-    local size = ui.ask_number(
-        "Dump size in bytes",
-        0
-    )
-
-    if not size or size <= 0 then
-        return
-    end
-
-    local path = ui.ask_text(
-        "Output file",
-        "0:/gm9/out/cart.bin",
-        200
-    )
-
-    if not path then
-        return
-    end
-
-    fs.cart_dump(path, size)
-
-    message(
-        "GAME CARD DUMP\n\n" ..
-        "Finished.\n\n" ..
-        path
-    )
-end
-
--- ============================================================
--- DATABASE
--- ============================================================
-
-local function create_databases()
-
-    if not extreme_lock("CREATE DATABASES") then
-        return
-    end
-
-    local drive = ui.ask_text(
-        "Destination drive",
-        "A:",
-        10
-    )
-
-    if not drive then
-        return
-    end
-
-    fs.create_dbs(drive)
-
-    message(
-        "DATABASES\n\n" ..
-        "Operation completed."
-    )
-end
-
--- ============================================================
--- SAFE FILE COPY
--- ============================================================
-
-local function copy_file()
-
-    local src = fs.ask_select_file(
-        "Select source",
-        "0:/*",
-        { include_dirs = true, explorer = true }
+    local src = select_file(
+        "Select source file",
+        "0:/ *"
     )
 
     if not src then
@@ -794,8 +567,8 @@ local function copy_file()
     end
 
     local dst = ui.ask_text(
-        "Destination",
-        "0:/gm9/out/",
+        "Output file:",
+        "0:/patched.bin",
         200
     )
 
@@ -803,300 +576,526 @@ local function copy_file()
         return
     end
 
-    fs.copy(src, dst)
+    if not confirm(
+        "Apply " .. kind .. " patch?"
+    ) then
+        return
+    end
 
-    message(
-        "COPY COMPLETE\n\n" ..
-        src .. "\n\n->\n\n" ..
-        dst
-    )
+    safe_call(function()
+        if kind == "IPS" then
+            title.apply_ips(patch, src, dst)
+        elseif kind == "BPS" then
+            title.apply_bps(patch, src, dst)
+        elseif kind == "BPM" then
+            title.apply_bpm(patch, src, dst)
+        end
+
+        ui.echo("Patch operation completed.")
+    end)
 end
 
--- ============================================================
--- DELETE
--- ============================================================
+local function patch_tools()
+    while true do
+        local choice = ui.ask_selection(
+            "PATCH TOOLS",
+            {
+                "Apply IPS",
+                "Apply BPS",
+                "Apply BPM",
+                "Back"
+            }
+        )
 
-local function delete_file()
-
-    if not extreme_lock("DELETE FILE") then
-        return
+        if not choice or choice == 4 then
+            return
+        elseif choice == 1 then
+            apply_patch("IPS")
+        elseif choice == 2 then
+            apply_patch("BPS")
+        elseif choice == 3 then
+            apply_patch("BPM")
+        end
     end
-
-    local path = fs.ask_select_file(
-        "Select item to delete",
-        "0:/*",
-        { include_dirs = false, explorer = true }
-    )
-
-    if not path then
-        return
-    end
-
-    local confirmed = ui.ask(
-        "Delete this file?\n\n" .. path
-    )
-
-    if not confirmed then
-        return
-    end
-
-    fs.remove(path)
-
-    message(
-        "DELETE COMPLETE\n\n" ..
-        path
-    )
 end
 
--- ============================================================
--- POWER MENU
--- ============================================================
+------------------------------------------------------------
+-- Code tools
+------------------------------------------------------------
 
-local function power_menu()
+local function extract_code()
+    local src = select_file(
+        "Select source containing .code",
+        "0:/*"
+    )
 
+    if not src then
+        return
+    end
+
+    local dst = ui.ask_text(
+        "Destination .code:",
+        "0:/code.bin",
+        200
+    )
+
+    if not dst then
+        return
+    end
+
+    safe_call(function()
+        title.extract_code(src, dst)
+        ui.echo("Code extracted.")
+    end)
+end
+
+local function compress_code()
+    local src = select_file(
+        "Select extracted .code",
+        "0:/*"
+    )
+
+    if not src then
+        return
+    end
+
+    local dst = ui.ask_text(
+        "Destination:",
+        "0:/code.compressed",
+        200
+    )
+
+    if not dst then
+        return
+    end
+
+    safe_call(function()
+        title.compress_code(src, dst)
+        ui.echo("Code compressed.")
+    end)
+end
+
+local function code_tools()
+    while true do
+        local choice = ui.ask_selection(
+            "CODE TOOLS",
+            {
+                "Extract Code",
+                "Compress Code",
+                "Back"
+            }
+        )
+
+        if not choice or choice == 3 then
+            return
+        elseif choice == 1 then
+            extract_code()
+        elseif choice == 2 then
+            compress_code()
+        end
+    end
+end
+
+------------------------------------------------------------
+-- Key tools
+------------------------------------------------------------
+
+local function key_tools()
+    while true do
+        local choice = ui.ask_selection(
+            "KEY TOOLS",
+            {
+                "Dump seeddb.bin",
+                "Dump encTitleKeys.bin",
+                "Dump decTitleKeys.bin",
+                "Back"
+            }
+        )
+
+        if not choice or choice == 4 then
+            return
+        elseif choice == 1 then
+            safe_call(function()
+                fs.key_dump("seeddb.bin")
+                ui.echo("seeddb.bin created in 0:/gm9/out")
+            end)
+        elseif choice == 2 then
+            safe_call(function()
+                fs.key_dump("encTitleKeys.bin")
+                ui.echo("encTitleKeys.bin created in 0:/gm9/out")
+            end)
+        elseif choice == 3 then
+            safe_call(function()
+                fs.key_dump("decTitleKeys.bin")
+                ui.echo("decTitleKeys.bin created in 0:/gm9/out")
+            end)
+        end
+    end
+end
+
+------------------------------------------------------------
+-- Database tools
+------------------------------------------------------------
+
+local function database_tools()
     local choice = ui.ask_selection(
-        "POWER",
+        "DATABASE TOOLS",
         {
-            "Reboot",
-            "Power Off",
-            "Cancel"
+            "Create SysNAND CTRNAND DBs",
+            "Create EmuNAND CTRNAND DBs",
+            "Create SysNAND SD DBs",
+            "Create EmuNAND SD DBs",
+            "Back"
         }
     )
 
-    if not choice or choice == 3 then
+    if not choice or choice == 5 then
         return
     end
 
-    if not danger_lock("POWER CONTROL") then
-        return
-    end
+    local drive
 
     if choice == 1 then
-        sys.reboot()
+        drive = "1:"
     elseif choice == 2 then
-        sys.power_off()
+        drive = "4:"
+    elseif choice == 3 then
+        drive = "A:"
+    elseif choice == 4 then
+        drive = "B:"
     end
+
+    if not confirm(
+        "Create/recreate databases on " ..
+        drive .. "?"
+    ) then
+        return
+    end
+
+    safe_call(function()
+        fs.create_dbs(drive)
+        ui.echo("Database operation completed.")
+    end)
 end
 
--- ============================================================
--- HARDWARE INFORMATION
--- ============================================================
+------------------------------------------------------------
+-- Cartridge tools
+------------------------------------------------------------
 
-local function hardware_information()
-
-    local voltage = i2c.read(
-        i2c.dev.MCU,
-        i2c.mcu.reg.BATTERY_VOLTAGE,
-        1
+local function cartridge_dump()
+    local size = ui.ask_number(
+        "Cartridge dump size in bytes:",
+        0
     )
 
-    local battery = i2c.read(
-        i2c.dev.MCU,
-        i2c.mcu.reg.BATTERY_PERCENTAGE_INT,
-        1
+    if not size or size <= 0 then
+        ui.echo("Invalid size.")
+        return
+    end
+
+    local dst = ui.ask_text(
+        "Output file:",
+        "0:/gm9/out/cart.bin",
+        200
     )
 
-    local power = i2c.read(
-        i2c.dev.MCU,
-        i2c.mcu.reg.POWER_STATUS,
-        1
-    )
+    if not dst then
+        return
+    end
 
-    message(
-        "HARDWARE INFORMATION\n\n" ..
-        "Battery: " .. tostring(battery[1]) .. "%\n" ..
-        "Voltage raw: " .. tostring(voltage[1]) .. "\n" ..
-        "Power status: " .. tostring(power[1]) .. "\n\n" ..
-        "Gyro model: " .. tostring(GYROMODEL)
-    )
+    if not confirm(
+        "DUMP GAME CARD?\n\n" ..
+        "Size: " .. tostring(size) .. " bytes"
+    ) then
+        return
+    end
+
+    safe_call(function()
+        fs.cart_dump(dst, size)
+        ui.echo("Cartridge dump completed.")
+    end)
 end
 
--- ============================================================
--- MAIN MENUS
--- ============================================================
+------------------------------------------------------------
+-- LED tools
+------------------------------------------------------------
 
-local function system_menu()
-
+local function led_tools()
     while true do
-
-        local c = ui.ask_selection(
-            APP_NAME .. " / SYSTEM",
+        local choice = ui.ask_selection(
+            "LED TOOLS",
             {
-                "System Information",
-                "Console Information",
-                "EmuNAND Information",
-                "Date / Time",
-                "Hardware Information",
+                "Power LED: Blue",
+                "Power LED: Red",
+                "Power LED: Off",
+                "Power LED: Normal",
                 "Back"
             }
         )
 
-        if not c or c == 6 then
+        if not choice or choice == 5 then
             return
-        elseif c == 1 then
-            system_information()
-        elseif c == 2 then
-            console_information()
-        elseif c == 3 then
-            emunand_information()
-        elseif c == 4 then
-            date_time()
-        elseif c == 5 then
-            hardware_information()
         end
+
+        safe_call(function()
+            if choice == 1 then
+                i2c.write(
+                    i2c.dev.MCU,
+                    i2c.mcu.reg.POWER_LED_STATE,
+                    {5}
+                )
+            elseif choice == 2 then
+                i2c.write(
+                    i2c.dev.MCU,
+                    i2c.mcu.reg.POWER_LED_STATE,
+                    {4}
+                )
+            elseif choice == 3 then
+                i2c.write(
+                    i2c.dev.MCU,
+                    i2c.mcu.reg.POWER_LED_STATE,
+                    {3}
+                )
+            elseif choice == 4 then
+                i2c.write(
+                    i2c.dev.MCU,
+                    i2c.mcu.reg.POWER_LED_STATE,
+                    {0}
+                )
+            end
+
+            ui.echo("LED operation completed.")
+        end)
     end
 end
 
-local function storage_menu()
+------------------------------------------------------------
+-- Utilities
+------------------------------------------------------------
 
+local function utilities()
     while true do
-
-        local c = ui.ask_selection(
-            APP_NAME .. " / STORAGE",
+        local choice = ui.ask_selection(
+            "UTILITIES",
             {
-                "SD Card Information",
-                "Browse Files",
-                "File Information",
-                "Directory Information",
-                "Find Files",
-                "Hash File",
-                "Verify File",
-                "Verify SHA",
-                "Copy File",
-                "Delete File [LOCKED]",
-                "Back"
-            }
-        )
-
-        if not c or c == 11 then
-            return
-        elseif c == 1 then
-            sd_information()
-        elseif c == 2 then
-            browse_files()
-        elseif c == 3 then
-            file_information()
-        elseif c == 4 then
-            directory_information()
-        elseif c == 5 then
-            find_files()
-        elseif c == 6 then
-            hash_file()
-        elseif c == 7 then
-            verify_file()
-        elseif c == 8 then
-            verify_sha()
-        elseif c == 9 then
-            copy_file()
-        elseif c == 10 then
-            delete_file()
-        end
-    end
-end
-
-local function title_menu()
-
-    while true do
-
-        local c = ui.ask_selection(
-            APP_NAME .. " / TITLES",
-            {
-                "Build CIA [LOCKED]",
-                "Extract Code [LOCKED]",
-                "Compress Code [LOCKED]",
-                "Apply Patch [LOCKED]",
-                "Key Dump [LOCKED]",
-                "Game Card Dump [LOCKED]",
-                "Back"
-            }
-        )
-
-        if not c or c == 7 then
-            return
-        elseif c == 1 then
-            build_cia()
-        elseif c == 2 then
-            extract_code()
-        elseif c == 3 then
-            compress_code()
-        elseif c == 4 then
-            patch_menu()
-        elseif c == 5 then
-            key_dump()
-        elseif c == 6 then
-            cart_dump()
-        end
-    end
-end
-
-local function utility_menu()
-
-    while true do
-
-        local c = ui.ask_selection(
-            APP_NAME .. " / UTILITIES",
-            {
-                "QR Generator",
                 "Text Viewer",
-                "Mounted Image",
-                "Mount Image",
-                "Unmount Image",
-                "Create Databases [LOCKED]",
+                "QR Code",
+                "Refresh System Info",
+                "Switch SD Card",
+                "Reboot",
+                "Power Off",
                 "Back"
             }
         )
 
-        if not c or c == 7 then
+        if not choice or choice == 7 then
             return
-        elseif c == 1 then
-            qr_tool()
-        elseif c == 2 then
-            text_viewer()
-        elseif c == 3 then
-            mounted_image()
-        elseif c == 4 then
-            mount_image()
-        elseif c == 5 then
-            unmount_image()
-        elseif c == 6 then
-            create_databases()
+        elseif choice == 1 then
+            local path = select_file(
+                "Select text file",
+                "0:/*.txt"
+            )
+
+            if path then
+                safe_call(function()
+                    ui.show_file_text_viewer(path)
+                end)
+            end
+
+        elseif choice == 2 then
+            local text = ui.ask_text(
+                "QR prompt:",
+                "TheRealDev",
+                100
+            )
+
+            if text then
+                local data = ui.ask_text(
+                    "QR data:",
+                    "",
+                    500
+                )
+
+                if data then
+                    safe_call(function()
+                        ui.show_qr(text, data)
+                    end)
+                end
+            end
+
+        elseif choice == 3 then
+            safe_call(function()
+                sys.refresh_info()
+                ui.echo("System information refreshed.")
+            end)
+
+        elseif choice == 4 then
+            safe_call(function()
+                fs.sd_switch()
+            end)
+
+        elseif choice == 5 then
+            if confirm("REBOOT THE CONSOLE?") then
+                safe_call(function()
+                    sys.reboot()
+                end)
+            end
+
+        elseif choice == 6 then
+            if confirm("POWER OFF THE CONSOLE?") then
+                safe_call(function()
+                    sys.power_off()
+                end)
+            end
         end
     end
 end
 
-local function power_section()
-    power_menu()
+------------------------------------------------------------
+-- 10-step lock
+--
+-- Important:
+-- ui.check_key() reports currently-held keys.
+-- We wait for release after every successful step so that
+-- one physical press cannot accidentally count twice.
+------------------------------------------------------------
+
+local LOCK_SEQUENCE = {
+    "A",
+    "LEFT",
+    "B",
+    "RIGHT",
+    "UP",
+    "DOWN",
+    "L",
+    "R",
+    "X",
+    "Y"
+}
+
+local function wait_for_release(key)
+    while ui.check_key(key) do
+    end
 end
 
--- ============================================================
--- MAIN PROGRAM
--- ============================================================
+local function wait_for_any_lock_key()
+    while true do
+        for _, key in ipairs(LOCK_SEQUENCE) do
+            if ui.check_key(key) then
+                return key
+            end
+        end
+    end
+end
+
+local function lock_screen(step, expected)
+    ui.show_text(
+        "LOCK SYSTEM\n\n" ..
+        "Step " .. tostring(step) .. " / 10"
+    )
+
+    -- This is deliberately displayed on the bottom screen.
+    ui.echo(
+        "LOCK SYSTEM\n\n" ..
+        "Step " .. tostring(step) .. " / 10\n\n" ..
+        "Press: " .. expected
+    )
+end
+
+local function ten_step_lock()
+    for step, expected in ipairs(LOCK_SEQUENCE) do
+        lock_screen(step, expected)
+
+        local pressed = wait_for_any_lock_key()
+
+        if pressed ~= expected then
+            ui.echo(
+                "WRONG INPUT\n\n" ..
+                "Returning to main menu."
+            )
+            wait_a()
+
+            return false
+        end
+
+        wait_for_release(pressed)
+    end
+
+    ui.echo(
+        "ACCESS GRANTED\n\n" ..
+        "The 10-step sequence is correct."
+    )
+
+    return true
+end
+
+------------------------------------------------------------
+-- About
+------------------------------------------------------------
+
+local function about()
+    ui.show_text(
+        "TheRealDev\n\n" ..
+        "Version " .. VERSION .. "\n\n" ..
+        "A multi-purpose GodMode9 Lua utility.\n\n" ..
+        "Designed around the documented\n" ..
+        "GodMode9 Lua API.\n\n" ..
+        "No FTP / network functions are used."
+    )
+
+    wait_a()
+end
+
+------------------------------------------------------------
+-- Main loop
+------------------------------------------------------------
 
 while true do
+    local choice = main_menu()
 
-    local choice = ui.ask_selection(
-        APP_NAME .. " v" .. VERSION,
-        {
-            "System",
-            "Storage",
-            "Titles / Games",
-            "Utilities",
-            "Power",
-            "Exit"
-        }
-    )
-
-    if not choice or choice == 6 then
+    if not choice or choice == 15 then
         break
+
     elseif choice == 1 then
-        system_menu()
+        system_information()
+
     elseif choice == 2 then
-        storage_menu()
+        sd_information()
+
     elseif choice == 3 then
-        title_menu()
+        file_tools()
+
     elseif choice == 4 then
-        utility_menu()
+        hash_verify()
+
     elseif choice == 5 then
-        power_section()
+        title_tools()
+
+    elseif choice == 6 then
+        patch_tools()
+
+    elseif choice == 7 then
+        code_tools()
+
+    elseif choice == 8 then
+        key_tools()
+
+    elseif choice == 9 then
+        database_tools()
+
+    elseif choice == 10 then
+        cartridge_dump()
+
+    elseif choice == 11 then
+        led_tools()
+
+    elseif choice == 12 then
+        utilities()
+
+    elseif choice == 13 then
+        ten_step_lock()
+
+    elseif choice == 14 then
+        about()
     end
 end
